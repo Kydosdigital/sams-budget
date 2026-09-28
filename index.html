@@ -268,7 +268,7 @@ document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>document.getElem
     }
     row.push(field);if(row.some(x=>String(x).trim()!==''))out.push(row);
     if(out.length<2)return out;
-    const counts=[',',';','\t'].map(d=>({d,n:(text.slice(0,5000).match(new RegExp(d==='\\t'?'\\t':d===';'?';':',','g'))||[]).length})).sort((a,b)=>b.n-a.n);
+    const sample=text.slice(0,5000);const counts=[{d:',',n:(sample.match(/,/g)||[]).length},{d:';',n:(sample.match(/;/g)||[]).length},{d:'\t',n:(sample.match(/\t/g)||[]).length}].sort((a,b)=>b.n-a.n);
     const delimiter=counts[0].d;
     if(delimiter!==','){
       const reparsed=[];row=[];field='';quoted=false;
