@@ -18,6 +18,58 @@ table{width:100%;border-collapse:collapse;min-width:680px}th,td{padding:11px;bor
 @media(max-width:850px){.summary{grid-template-columns:1fr 1fr}.cols{grid-template-columns:1fr}.sticky{position:static}.row{grid-template-columns:1fr 1fr}.row small{grid-column:1/-1}}
 @media(max-width:580px){.app{padding:11px}header{flex-direction:column;align-items:stretch;border-radius:17px}h1{font-size:27px}.summary,.formgrid{grid-template-columns:1fr}.row{grid-template-columns:1fr}.head{flex-direction:column}nav{flex-wrap:nowrap;overflow:auto}.navbtn{flex:0 0 auto}}
 </style>
+
+<style id="mobile-app-redesign">
+@media(max-width:850px){
+  body{padding-bottom:76px}
+  .app{padding:10px 10px 88px}
+  header{border-radius:18px;padding:16px}
+  header h1{font-size:22px}
+  nav:not(.mobile-tabbar){display:none!important}
+  .summary{grid-template-columns:1fr 1fr!important;gap:9px!important;margin-top:10px}
+  .metric{padding:13px!important;border-radius:15px}
+  .metric b{font-size:20px!important}
+  .metric small{font-size:10px}
+  .cols,.cols>.stack,.cols>aside{display:contents!important}
+  .card{border-radius:16px;padding:14px;margin-top:10px}
+  .sticky{position:static!important}
+  .formgrid{grid-template-columns:1fr 1fr!important}
+  .budgetitem{padding:10px!important}
+  .budgetitem .row{grid-template-columns:1fr 1fr!important;gap:7px!important}
+  .budgetitem .row .n{grid-column:1/-1}
+  .budgetitem .row small{grid-column:1/-1!important}
+  .budgetitem .row .del{grid-column:2;padding:8px!important}
+  .budgetitem .usage{margin-top:5px}
+  .head{align-items:center}
+  .head h2{font-size:17px}
+  .head p{font-size:11px}
+  table{min-width:620px}
+  body[data-screen="overview"] [data-mobile-screen]:not([data-mobile-screen="overview"]),
+  body[data-screen="spend"] [data-mobile-screen]:not([data-mobile-screen="spend"]),
+  body[data-screen="budget"] [data-mobile-screen]:not([data-mobile-screen="budget"]),
+  body[data-screen="history"] [data-mobile-screen]:not([data-mobile-screen="history"]),
+  body[data-screen="more"] [data-mobile-screen]:not([data-mobile-screen="more"]){display:none!important}
+  .mobile-tabbar{
+    position:fixed;left:0;right:0;bottom:0;z-index:999;
+    display:grid!important;grid-template-columns:repeat(5,1fr);
+    background:rgba(255,255,255,.97);backdrop-filter:blur(16px);
+    border-top:1px solid var(--line);
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+    margin:0!important
+  }
+  .mobile-tabbar button{
+    border:0;background:transparent;color:#667085;border-radius:10px;
+    padding:7px 2px;font-size:10px;font-weight:800
+  }
+  .mobile-tabbar button .mi{display:block;font-size:18px;line-height:1;margin-bottom:4px}
+  .mobile-tabbar button.active{background:#f1f5f9;color:#0f172a}
+}
+@media(max-width:390px){
+  .summary{grid-template-columns:1fr 1fr!important}
+  .metric b{font-size:18px!important}
+  .formgrid{grid-template-columns:1fr!important}
+}
+</style>
 </head>
 <body>
 <div class="app">
@@ -96,4 +148,47 @@ $('export').onclick=()=>{let b=new Blob([JSON.stringify({app:"Sam's Budget",vers
 $('import').onclick=()=>$('file').click();$('file').onchange=async e=>{try{let j=JSON.parse(await e.target.files[0].text()),x=j.data||j;if(!x.settings||!Array.isArray(x.categories)||!Array.isArray(x.transactions))throw 0;if(confirm('Replace the current data with this backup?')){s=x;render()}}catch{alert('Invalid backup file')}e.target.value=''};
 $('reset').onclick=()=>{if(confirm('Reset everything? This deletes all saved expenses in this browser.')){s=starter();active=nowMonth();$('month').value=active;render()}};
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.go).scrollIntoView({behavior:'smooth'}));render();
-</script></body></html>
+</script>
+<script id="mobile-app-tabs">
+(function(){
+  const top=document.getElementById('top');
+  const income=document.getElementById('income');
+  const plan=document.getElementById('plan');
+  const history=document.getElementById('history');
+  const add=document.getElementById('add');
+  const aside=document.querySelector('.cols > aside.stack');
+  if(!top||!income||!plan||!history||!add||!aside)return;
+  top.dataset.mobileScreen='overview';
+  income.dataset.mobileScreen='budget';
+  plan.dataset.mobileScreen='budget';
+  history.dataset.mobileScreen='history';
+  add.dataset.mobileScreen='spend';
+  const asideCards=[...aside.children];
+  if(asideCards[1])asideCards[1].dataset.mobileScreen='overview';
+  if(asideCards[2])asideCards[2].dataset.mobileScreen='overview';
+  if(asideCards[3])asideCards[3].dataset.mobileScreen='more';
+
+  const nav=document.createElement('nav');
+  nav.className='mobile-tabbar';
+  nav.innerHTML=
+    '<button data-ms="overview"><span class="mi">⌂</span>Overview</button>'+
+    '<button data-ms="spend"><span class="mi">＋</span>Spend</button>'+
+    '<button data-ms="budget"><span class="mi">₦</span>Budget</button>'+
+    '<button data-ms="history"><span class="mi">≡</span>History</button>'+
+    '<button data-ms="more"><span class="mi">•••</span>More</button>';
+  document.body.appendChild(nav);
+
+  function show(screen){
+    document.body.dataset.screen=screen;
+    nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.ms===screen));
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  nav.addEventListener('click',e=>{
+    const b=e.target.closest('button[data-ms]');
+    if(b)show(b.dataset.ms);
+  });
+  document.querySelectorAll('[data-go="add"]').forEach(b=>b.addEventListener('click',()=>show('spend')));
+  show('overview');
+})();
+</script>
+</body></html>
