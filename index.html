@@ -70,6 +70,30 @@ table{width:100%;border-collapse:collapse;min-width:680px}th,td{padding:11px;bor
   .formgrid{grid-template-columns:1fr!important}
 }
 </style>
+
+<style id="statement-import-styles">
+.statement-drop{border:1.5px dashed #cbd5e1;border-radius:14px;padding:14px;background:#f8fafc;text-align:center}
+.statement-drop strong{display:block;font-size:13px;margin-bottom:4px}.statement-drop p{margin:0 0 10px;color:var(--muted);font-size:11px;line-height:1.45}
+.statement-status{margin-top:10px;border-radius:12px;padding:10px 11px;font-size:11px;line-height:1.45;background:#eff6ff;color:#1e40af}
+.statement-status.warn{background:#fff7ed;color:#92400e}.statement-status.bad{background:#fff1f2;color:#991b1b}
+.statement-review{margin-top:12px}.statement-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px}
+.statement-summary div{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center}
+.statement-summary b{display:block;font-size:14px}.statement-summary span{font-size:9px;color:var(--muted)}
+.statement-rows{display:grid;gap:8px;max-height:520px;overflow:auto;padding-right:2px}
+.statement-row{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+.statement-row.duplicate{opacity:.62}.statement-rowtop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.statement-desc{font-size:12px;font-weight:700;line-height:1.35}.statement-date{font-size:10px;color:var(--muted);margin-top:3px}
+.statement-amount{font-size:13px;font-weight:800;white-space:nowrap}.statement-controls{display:grid;grid-template-columns:.8fr 1.2fr;gap:7px;margin-top:8px}
+.statement-controls select{width:100%;border:1px solid #d0d5dd;border-radius:9px;padding:8px;background:#fff;font-size:11px}
+.statement-badge{display:inline-block;margin-top:6px;border-radius:999px;padding:3px 7px;font-size:9px;font-weight:800;background:#f2f4f7;color:#475467}
+.statement-badge.dup{background:#fff1f2;color:#b42318}.statement-badge.review{background:#fff7ed;color:#92400e}
+.statement-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+@media(max-width:850px){
+  .statement-summary{grid-template-columns:1fr 1fr}
+  .statement-rows{max-height:none;overflow:visible}
+  .statement-controls{grid-template-columns:1fr 1fr}
+}
+</style>
 </head>
 <body>
 <div class="app">
@@ -114,6 +138,25 @@ table{width:100%;border-collapse:collapse;min-width:680px}th,td{padding:11px;bor
 
 <div class="card"><div class="head"><div><h2>Where the money went</h2><p>Actual spending by category.</p></div></div><div id="bars" class="bars"></div></div>
 
+
+<div class="card" id="statementImport"><div class="head"><div><h2>Import bank statement</h2><p>Upload a CSV statement and turn the transactions into expenses.</p></div></div>
+  <div class="statement-drop">
+    <strong>CSV statement</strong>
+    <p>The file is processed on this device. It is not uploaded to a server.</p>
+    <button class="btn primary" id="chooseStatement">Choose CSV file</button>
+    <input id="bankCsv" type="file" accept=".csv,text/csv" hidden>
+  </div>
+  <div id="statementStatus" class="statement-status" style="display:none"></div>
+  <div id="statementReview" class="statement-review" style="display:none">
+    <div id="statementSummary" class="statement-summary"></div>
+    <div id="statementRows" class="statement-rows"></div>
+    <div class="statement-actions">
+      <button class="btn soft" id="cancelStatement">Cancel</button>
+      <button class="btn blue" id="importStatement">Import expenses</button>
+    </div>
+  </div>
+</div>
+
 <div class="card"><div class="head"><div><h2>Backup & restore</h2><p>Your data stays in this browser.</p></div></div><div class="backup">Export a backup occasionally, especially before changing phones or browsers.<div class="actions" style="margin-top:10px"><button class="btn soft" id="export">Export</button><button class="btn soft" id="import">Import</button><input id="file" type="file" accept="application/json" hidden></div></div><button id="reset" class="btn danger" style="margin-top:10px">Reset everything</button></div>
 </aside>
 </section>
@@ -149,6 +192,271 @@ $('import').onclick=()=>$('file').click();$('file').onchange=async e=>{try{let j
 $('reset').onclick=()=>{if(confirm('Reset everything? This deletes all saved expenses in this browser.')){s=starter();active=nowMonth();$('month').value=active;render()}};
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.go).scrollIntoView({behavior:'smooth'}));render();
 </script>
+
+<script id="statement-import-script">
+(function(){
+  const fileInput=document.getElementById('bankCsv');
+  const choose=document.getElementById('chooseStatement');
+  const review=document.getElementById('statementReview');
+  const rowsBox=document.getElementById('statementRows');
+  const summaryBox=document.getElementById('statementSummary');
+  const statusBox=document.getElementById('statementStatus');
+  const importBtn=document.getElementById('importStatement');
+  const cancelBtn=document.getElementById('cancelStatement');
+  if(!fileInput||!choose||!review||!rowsBox||!summaryBox||!statusBox||!importBtn||!cancelBtn)return;
+
+  let staged=[];
+
+  const aliases={
+    date:['date','transaction date','trans date','tran date','value date','posted date','posting date','booking date'],
+    desc:['description','narration','details','transaction details','transaction description','memo','remarks','reference','particulars'],
+    debit:['debit','debit amount','amount debited','withdrawal','withdrawals','money out','debits'],
+    credit:['credit','credit amount','amount credited','deposit','deposits','money in','credits'],
+    amount:['amount','transaction amount','trans amount','value'],
+    type:['type','transaction type','dr/cr','debit/credit','direction','entry type']
+  };
+  const norm=x=>String(x==null?'':x).trim().toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
+  const cleanDesc=x=>String(x==null?'':x).trim().replace(/\s+/g,' ');
+  const parseAmount=v=>{
+    let x=String(v==null?'':v).trim();
+    if(!x)return 0;
+    const par=/^\(.*\)$/.test(x);
+    x=x.replace(/[₦$£€,\s]/g,'').replace(/(?:CR|DR)$/i,'');
+    const n=parseFloat(x.replace(/[^\d.+-]/g,''));
+    if(!Number.isFinite(n))return 0;
+    return par?-Math.abs(n):n;
+  };
+  const parseDate=v=>{
+    const raw=String(v==null?'':v).trim();
+    if(!raw)return '';
+    if(/^\d{5}(\.\d+)?$/.test(raw)){
+      const serial=parseFloat(raw);
+      const d=new Date(Date.UTC(1899,11,30)+serial*86400000);
+      return d.toISOString().slice(0,10);
+    }
+    let m=raw.match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+    if(m)return m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');
+    m=raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);
+    if(m){
+      let y=+m[3]; if(y<100)y+=2000;
+      return y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[1]).padStart(2,'0');
+    }
+    const d=new Date(raw);
+    if(!Number.isNaN(d.getTime()))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    return '';
+  };
+  function parseCsv(text){
+    const out=[];let row=[],field='',quoted=false;
+    text=String(text||'').replace(/^\uFEFF/,'');
+    for(let i=0;i<text.length;i++){
+      const ch=text[i];
+      if(quoted){
+        if(ch==='"'&&text[i+1]==='"'){field+='"';i++}
+        else if(ch==='"')quoted=false;
+        else field+=ch;
+      }else{
+        if(ch==='"')quoted=true;
+        else if(ch===','||ch===';'||ch==='\t'){
+          if(!row._delim){row._delim=ch}
+          if(ch===row._delim){row.push(field);field=''}else field+=ch;
+        }else if(ch==='\n'){
+          row.push(field);field='';
+          if(row.some(x=>String(x).trim()!==''))out.push(row);
+          row=[];quoted=false;
+        }else if(ch!=='\r')field+=ch;
+      }
+    }
+    row.push(field);if(row.some(x=>String(x).trim()!==''))out.push(row);
+    if(out.length<2)return out;
+    const counts=[',',';','\t'].map(d=>({d,n:(text.slice(0,5000).match(new RegExp(d==='\\t'?'\\t':d===';'?';':',','g'))||[]).length})).sort((a,b)=>b.n-a.n);
+    const delimiter=counts[0].d;
+    if(delimiter!==','){
+      const reparsed=[];row=[];field='';quoted=false;
+      for(let i=0;i<text.length;i++){
+        const ch=text[i];
+        if(quoted){
+          if(ch==='"'&&text[i+1]==='"'){field+='"';i++}
+          else if(ch==='"')quoted=false; else field+=ch;
+        }else{
+          if(ch==='"')quoted=true;
+          else if(ch===delimiter){row.push(field);field=''}
+          else if(ch==='\n'){row.push(field);field='';if(row.some(x=>String(x).trim()!==''))reparsed.push(row);row=[]}
+          else if(ch!=='\r')field+=ch;
+        }
+      }
+      row.push(field);if(row.some(x=>String(x).trim()!==''))reparsed.push(row);
+      return reparsed;
+    }
+    return out.map(r=>{delete r._delim;return r});
+  }
+  function headerScore(row){
+    const cells=row.map(norm);
+    let score=0;
+    Object.values(aliases).forEach(list=>{if(cells.some(x=>list.includes(x)))score++});
+    return score;
+  }
+  function columnIndex(headers,key){
+    const h=headers.map(norm),list=aliases[key];
+    for(let i=0;i<h.length;i++)if(list.includes(h[i]))return i;
+    for(let i=0;i<h.length;i++)if(list.some(a=>h[i].includes(a)))return i;
+    return -1;
+  }
+  function fingerprint(date,amount,desc){
+    return [date,(+amount||0).toFixed(2),norm(desc).replace(/[^\w\s]/g,'').replace(/\s+/g,' ')].join('|');
+  }
+  function existingKeys(){
+    const set=new Set();
+    (s.transactions||[]).forEach(t=>set.add(t.sourceKey||fingerprint(t.date,t.amount,t.desc||'')));
+    return set;
+  }
+  function categoryIdByName(name){
+    const target=norm(name);
+    const found=s.categories.find(c=>norm(c.name)===target||norm(c.name).includes(target)||target.includes(norm(c.name)));
+    return found?found.id:null;
+  }
+  function suggestCategory(desc){
+    const d=norm(desc);
+    const rules=[
+      ['Fuel',['fuel','petrol','filling station','totalenergies','total energies','mobil','nnpc']],
+      ['Transport',['bolt','uber','indrive','in drive','taxi','transport','bus fare','ride']],
+      ['Feeding',['food','restaurant','eatery','chicken republic','kfc','domino','pizza','cafe','coffee','grocery','groceries','supermarket']],
+      ['Bills & Utilities',['electricity','power bill','ikeja electric','eko electric','dstv','gotv','water bill','utility']],
+      ['Night Out / Fun',['lounge','nightclub','club','cinema','filmhouse','bar ',' bar','netflix','spotify']],
+      ['Airtime & Data',['airtime','data bundle','mtn','airtel','9mobile','glo mobile']],
+      ['Health',['pharmacy','hospital','clinic','medical','chemist']],
+      ['Personal Care',['salon','barber','spa','beauty']],
+      ['Debt Repayment',['loan repayment','loan payment','credit repayment']],
+      ['Rent / Housing',['house rent','rent payment','landlord']],
+      ['Gifts to Friends & Family',['gift','family support','allowance']]
+    ];
+    for(const r of rules)if(r[1].some(k=>d.includes(k))){const id=categoryIdByName(r[0]);if(id)return id}
+    return '__needs__';
+  }
+  function categoryOptions(selected){
+    let html='<option value="__needs__" '+(selected==='__needs__'?'selected':'')+'>Needs Review</option>';
+    html+=s.categories.map(c=>'<option value="'+c.id+'" '+(selected===c.id?'selected':'')+'>'+esc(c.name)+'</option>').join('');
+    return html;
+  }
+  function setStatus(msg,type){
+    statusBox.style.display=msg?'block':'none';
+    statusBox.className='statement-status'+(type?' '+type:'');
+    statusBox.textContent=msg||'';
+  }
+  function renderReview(){
+    const expenses=staged.filter(x=>x.action==='expense'&&!x.duplicate).length;
+    const ignored=staged.filter(x=>x.action==='ignore').length;
+    const dupes=staged.filter(x=>x.duplicate).length;
+    const needs=staged.filter(x=>x.action==='expense'&&x.categoryId==='__needs__'&&!x.duplicate).length;
+    summaryBox.innerHTML=
+      '<div><b>'+staged.length+'</b><span>ROWS FOUND</span></div>'+
+      '<div><b>'+expenses+'</b><span>TO IMPORT</span></div>'+
+      '<div><b>'+needs+'</b><span>NEED REVIEW</span></div>'+
+      '<div><b>'+dupes+'</b><span>DUPLICATES</span></div>';
+    rowsBox.innerHTML=staged.map((x,i)=>{
+      let badge='';
+      if(x.duplicate)badge='<span class="statement-badge dup">Already imported</span>';
+      else if(x.uncertain||x.categoryId==='__needs__')badge='<span class="statement-badge review">Check this</span>';
+      else if(x.action==='ignore')badge='<span class="statement-badge">Income / ignored</span>';
+      return '<div class="statement-row '+(x.duplicate?'duplicate':'')+'" data-i="'+i+'">'+
+        '<div class="statement-rowtop"><div><div class="statement-desc">'+esc(x.desc||'Bank transaction')+'</div><div class="statement-date">'+esc(x.date||'Unknown date')+'</div>'+badge+'</div><div class="statement-amount">'+money(x.amount)+'</div></div>'+
+        '<div class="statement-controls">'+
+          '<select class="statement-action" '+(x.duplicate?'disabled':'')+'><option value="expense" '+(x.action==='expense'?'selected':'')+'>Expense</option><option value="ignore" '+(x.action==='ignore'?'selected':'')+'>Ignore</option></select>'+
+          '<select class="statement-category" '+(x.action!=='expense'||x.duplicate?'disabled':'')+'>'+categoryOptions(x.categoryId)+'</select>'+
+        '</div></div>';
+    }).join('');
+    importBtn.textContent='Import '+expenses+' expense'+(expenses===1?'':'s');
+    importBtn.disabled=expenses===0;
+    review.style.display='block';
+  }
+  function stageRows(matrix,fileName){
+    if(matrix.length<2)throw new Error('This CSV does not contain enough rows.');
+    let best=0,bestScore=-1;
+    for(let i=0;i<Math.min(10,matrix.length);i++){const sc=headerScore(matrix[i]);if(sc>bestScore){bestScore=sc;best=i}}
+    const headers=matrix[best].map(x=>String(x).trim());
+    const idx={
+      date:columnIndex(headers,'date'),desc:columnIndex(headers,'desc'),debit:columnIndex(headers,'debit'),
+      credit:columnIndex(headers,'credit'),amount:columnIndex(headers,'amount'),type:columnIndex(headers,'type')
+    };
+    if(idx.date<0||(idx.debit<0&&idx.credit<0&&idx.amount<0)){
+      throw new Error('I could not identify the date and amount columns in this CSV. Download a transaction CSV that includes Date and Debit/Credit or Amount columns.');
+    }
+    const keys=existingKeys();
+    staged=[];
+    matrix.slice(best+1).forEach(row=>{
+      const date=parseDate(row[idx.date]);
+      const desc=cleanDesc(idx.desc>=0?row[idx.desc]:'Bank transaction');
+      const debit=idx.debit>=0?Math.abs(parseAmount(row[idx.debit])):0;
+      const credit=idx.credit>=0?Math.abs(parseAmount(row[idx.credit])):0;
+      const rawAmount=idx.amount>=0?parseAmount(row[idx.amount]):0;
+      const type=idx.type>=0?norm(row[idx.type]):'';
+      let action='expense',amount=0,uncertain=false;
+      if(debit>0){action='expense';amount=debit}
+      else if(credit>0){action='ignore';amount=credit}
+      else if(rawAmount!==0){
+        amount=Math.abs(rawAmount);
+        if(/credit|\bcr\b|deposit|money in|income/.test(type)){action='ignore'}
+        else if(/debit|\bdr\b|withdraw|money out|expense/.test(type)){action='expense'}
+        else if(rawAmount<0){action='expense'}
+        else{action='expense';uncertain=true}
+      }
+      if(!date||!amount)return;
+      const key=fingerprint(date,amount,desc);
+      const duplicate=keys.has(key);
+      const categoryId=action==='expense'?suggestCategory(desc):'__needs__';
+      staged.push({date,desc,amount,action,categoryId,duplicate,uncertain,sourceKey:key,fileName});
+    });
+    if(!staged.length)throw new Error('No usable transactions were found in this CSV.');
+    setStatus('Review the suggestions below before importing. Credits are ignored by default, and uncertain transactions are marked for review.','');
+    renderReview();
+  }
+
+  choose.onclick=()=>fileInput.click();
+  fileInput.onchange=async e=>{
+    const file=e.target.files&&e.target.files[0];
+    if(!file)return;
+    try{
+      setStatus('Reading '+file.name+'…','');
+      review.style.display='none';
+      const text=await file.text();
+      stageRows(parseCsv(text),file.name);
+    }catch(err){
+      staged=[];review.style.display='none';setStatus(err&&err.message?err.message:'I could not read this CSV.','bad');
+    }
+    e.target.value='';
+  };
+  rowsBox.onchange=e=>{
+    const row=e.target.closest('.statement-row');if(!row)return;
+    const item=staged[+row.dataset.i];if(!item)return;
+    if(e.target.classList.contains('statement-action')){
+      item.action=e.target.value;
+      if(item.action==='expense'&&!item.categoryId)item.categoryId='__needs__';
+    }
+    if(e.target.classList.contains('statement-category'))item.categoryId=e.target.value;
+    renderReview();
+  };
+  cancelBtn.onclick=()=>{staged=[];review.style.display='none';setStatus('Import cancelled. Nothing was added.','')};
+  importBtn.onclick=()=>{
+    const chosen=staged.filter(x=>x.action==='expense'&&!x.duplicate);
+    if(!chosen.length)return;
+    let needs=s.categories.find(c=>norm(c.name)==='needs review');
+    if(chosen.some(x=>x.categoryId==='__needs__')&&!needs){
+      needs={id:uid(),name:'Needs Review',amount:0,freq:'monthly'};
+      s.categories.push(needs);
+    }
+    chosen.forEach(x=>{
+      s.transactions.push({
+        id:uid(),date:x.date,categoryId:x.categoryId==='__needs__'?needs.id:x.categoryId,
+        desc:x.desc||'Bank transaction',amount:x.amount,source:'bank-csv',sourceKey:x.sourceKey,
+        importedAt:new Date().toISOString(),sourceFile:x.fileName
+      });
+    });
+    save();render();
+    const count=chosen.length;
+    staged=[];review.style.display='none';
+    setStatus(count+' expense'+(count===1?' was':'s were')+' imported successfully. Duplicates were skipped.','');
+  };
+})();
+</script>
 <script id="mobile-app-tabs">
 (function(){
   const top=document.getElementById('top');
@@ -167,6 +475,7 @@ document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>document.getElem
   if(asideCards[1])asideCards[1].dataset.mobileScreen='overview';
   if(asideCards[2])asideCards[2].dataset.mobileScreen='overview';
   if(asideCards[3])asideCards[3].dataset.mobileScreen='more';
+  if(asideCards[4])asideCards[4].dataset.mobileScreen='more';
 
   const nav=document.createElement('nav');
   nav.className='mobile-tabbar';
@@ -175,7 +484,7 @@ document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>document.getElem
     '<button data-ms="spend"><span class="mi">＋</span>Spend</button>'+
     '<button data-ms="budget"><span class="mi">₦</span>Budget</button>'+
     '<button data-ms="history"><span class="mi">≡</span>History</button>'+
-    '<button data-ms="more"><span class="mi">•••</span>More</button>';
+    '<button data-ms="more"><span class="mi">⇧</span>Import</button>';
   document.body.appendChild(nav);
 
   function show(screen){
