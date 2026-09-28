@@ -94,6 +94,23 @@ table{width:100%;border-collapse:collapse;min-width:680px}th,td{padding:11px;bor
   .statement-controls{grid-template-columns:1fr 1fr}
 }
 </style>
+
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="application-name" content="Sam's Budget">
+
+
+<style id="pwa-install-styles">
+.install-card{background:linear-gradient(135deg,#0f172a,#172554);color:#fff}
+.install-card .head p{color:#cbd5e1}
+.install-card .install-note{font-size:11px;line-height:1.5;color:#cbd5e1;margin-top:9px}
+.install-card .btn{background:#fff;color:#0f172a;width:100%}
+.install-card .installed{background:#ecfdf3;color:#166534;border-radius:10px;padding:9px 10px;font-size:11px;margin-top:9px}
+</style>
 </head>
 <body>
 <div class="app">
@@ -138,6 +155,13 @@ table{width:100%;border-collapse:collapse;min-width:680px}th,td{padding:11px;bor
 
 <div class="card"><div class="head"><div><h2>Where the money went</h2><p>Actual spending by category.</p></div></div><div id="bars" class="bars"></div></div>
 
+
+
+<div class="card install-card" id="installCard">
+  <div class="head"><div><h2>Install Sam's Budget</h2><p>Put it on his Android home screen and open it like a normal app.</p></div></div>
+  <button class="btn" id="installAppBtn">Install app</button>
+  <div class="install-note" id="installAppNote">On Android, use Chrome. Once installed it opens in its own app window.</div>
+</div>
 
 <div class="card" id="statementImport"><div class="head"><div><h2>Import bank statement</h2><p>Upload a CSV statement and turn the transactions into expenses.</p></div></div>
   <div class="statement-drop">
@@ -457,6 +481,51 @@ document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>document.getElem
   };
 })();
 </script>
+
+<script id="pwa-install-script">
+(function(){
+  let deferredPrompt=null;
+  const btn=document.getElementById('installAppBtn');
+  const note=document.getElementById('installAppNote');
+  const card=document.getElementById('installCard');
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));
+  }
+  const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  function installedState(){
+    if(!btn||!note)return;
+    if(isStandalone()){
+      btn.textContent='Installed';
+      btn.disabled=true;
+      note.className='installed';
+      note.textContent="Sam's Budget is installed on this device.";
+    }
+  }
+  window.addEventListener('beforeinstallprompt',e=>{
+    e.preventDefault();
+    deferredPrompt=e;
+    if(btn){
+      btn.disabled=false;
+      btn.textContent="Install Sam's Budget";
+      note.className='install-note';
+      note.textContent='Ready to install. Tap the button above.';
+    }
+  });
+  if(btn)btn.addEventListener('click',async()=>{
+    if(isStandalone())return;
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt=null;
+      installedState();
+    }else{
+      alert("In Chrome, tap the three-dot menu, then choose 'Install app' or 'Add to Home screen'.");
+    }
+  });
+  window.addEventListener('appinstalled',()=>{deferredPrompt=null;installedState()});
+  installedState();
+})();
+</script>
 <script id="mobile-app-tabs">
 (function(){
   const top=document.getElementById('top');
@@ -476,6 +545,7 @@ document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>document.getElem
   if(asideCards[2])asideCards[2].dataset.mobileScreen='overview';
   if(asideCards[3])asideCards[3].dataset.mobileScreen='more';
   if(asideCards[4])asideCards[4].dataset.mobileScreen='more';
+  if(asideCards[5])asideCards[5].dataset.mobileScreen='more';
 
   const nav=document.createElement('nav');
   nav.className='mobile-tabbar';
@@ -497,7 +567,8 @@ document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>document.getElem
     if(b)show(b.dataset.ms);
   });
   document.querySelectorAll('[data-go="add"]').forEach(b=>b.addEventListener('click',()=>show('spend')));
-  show('overview');
+  const requested=new URLSearchParams(location.search).get('screen');
+  show(['overview','spend','budget','history','more'].includes(requested)?requested:'overview');
 })();
 </script>
 </body></html>
