@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f172a"><title>Sam's Budget</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#172033;--muted:#667085;--line:#e6eaf0;--navy:#0f172a;--green:#16a34a;--red:#dc2626;--amber:#b45309;--blue:#2563eb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}button,input,select{font:inherit}button{cursor:pointer}.app{max-width:1180px;margin:auto;padding:22px}
+header{background:var(--navy);color:#fff;border-radius:22px;padding:22px;display:flex;justify-content:space-between;align-items:center;gap:16px}h1{margin:0;font-size:32px}header p{margin:6px 0 0;color:#cbd5e1;font-size:14px}header label{font-size:12px;color:#cbd5e1}header input{display:block;margin-top:5px;background:#111c31;color:#fff;border:1px solid #334155;border-radius:10px;padding:10px;color-scheme:dark}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}nav button,.btn{border:0;border-radius:10px;padding:9px 12px;font-weight:700}.navbtn{background:#fff;border:1px solid var(--line)}.primary{background:var(--navy);color:#fff}.blue{background:var(--blue);color:#fff}.soft{background:#f1f5f9}.danger{background:#fff1f2;color:#b91c1c}
+.grid{display:grid;gap:14px}.summary{grid-template-columns:repeat(4,1fr)}.cols{grid-template-columns:minmax(0,1.2fr) minmax(310px,.8fr);margin-top:14px}.stack{display:grid;gap:14px}.card{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;box-shadow:0 8px 26px rgba(15,23,42,.05)}.metric small,.muted{color:var(--muted)}.metric b{display:block;font-size:27px;margin-top:7px}.green{color:var(--green)}.red{color:var(--red)}
+.head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:14px}.head h2{margin:0;font-size:19px}.head p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:5px}.field input,.field select,.row input,.row select{width:100%;border:1px solid #dfe3ea;border-radius:10px;padding:10px;background:#fff}.field input:focus,.field select:focus,.row input:focus,.row select:focus{outline:3px solid #dbeafe;border-color:#93c5fd}
+.note{margin-top:12px;border-radius:12px;padding:11px 12px;background:#eff6ff;color:#1e40af;font-size:13px}.budgetlist{display:grid;gap:9px}.budgetitem{border:1px solid var(--line);border-radius:12px;padding:10px}.row{display:grid;grid-template-columns:1.4fr .8fr .8fr 1fr auto;gap:8px;align-items:center}.row small{color:var(--muted)}.usage{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);margin-top:7px}
+.progress{height:8px;background:#edf1f5;border-radius:999px;overflow:hidden;margin-top:6px}.progress i{display:block;height:100%;background:var(--green);border-radius:999px}.progress.over i{background:var(--red)}
+.status{display:flex;gap:10px;padding:12px;border-radius:12px;margin-bottom:14px;font-size:13px}.status.good{background:#ecfdf3;color:#166534}.status.warn{background:#fff7ed;color:#92400e}.status.bad{background:#fff1f2;color:#991b1b}.status b{display:block;margin-bottom:2px}.sticky{position:sticky;top:14px}
+table{width:100%;border-collapse:collapse;min-width:680px}th,td{padding:11px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}th{background:#f8fafc;color:var(--muted);font-size:11px;text-transform:uppercase}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px}.pill{background:#f1f5f9;border-radius:999px;padding:3px 7px}.actions{display:flex;gap:6px;flex-wrap:wrap}.empty{text-align:center;color:var(--muted);padding:22px}.bars{display:grid;gap:9px}.bar{display:grid;grid-template-columns:100px 1fr auto;gap:8px;align-items:center;font-size:12px}.track{height:8px;background:#edf1f5;border-radius:99px;overflow:hidden}.fill{height:100%;background:#64748b}.backup{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:12px;font-size:13px;color:var(--muted)}.footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
+@media(max-width:850px){.summary{grid-template-columns:1fr 1fr}.cols{grid-template-columns:1fr}.sticky{position:static}.row{grid-template-columns:1fr 1fr}.row small{grid-column:1/-1}}
+@media(max-width:580px){.app{padding:11px}header{flex-direction:column;align-items:stretch;border-radius:17px}h1{font-size:27px}.summary,.formgrid{grid-template-columns:1fr}.row{grid-template-columns:1fr}.head{flex-direction:column}nav{flex-wrap:nowrap;overflow:auto}.navbtn{flex:0 0 auto}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div><h1>Sam's Budget</h1><p>Know where every Naira goes, then decide what your money should do next.</p></div><div><label>Viewing month</label><input id="month" type="month"></div></header>
+<nav><button class="navbtn" data-go="top">Overview</button><button class="navbtn" data-go="income">Income</button><button class="navbtn" data-go="plan">Budget plan</button><button class="navbtn" data-go="add">Add spending</button><button class="navbtn" data-go="history">History</button></nav>
+
+<section id="top" class="grid summary">
+<div class="card metric"><small>Monthly income</small><b id="mIncome">₦0</b><small>Salary converted to Naira</small></div>
+<div class="card metric"><small>Planned spending</small><b id="mPlan">₦0</b><small>Daily, weekly and monthly combined</small></div>
+<div class="card metric"><small>Actually spent</small><b id="mSpent">₦0</b><small id="txCount">0 transactions</small></div>
+<div class="card metric"><small>Money left</small><b id="mLeft">₦0</b><small>Income minus actual spending</small></div>
+</section>
+
+<section class="grid cols">
+<div class="stack">
+<div class="card" id="income"><div class="head"><div><h2>Income settings</h2><p>Everything here is editable.</p></div></div>
+<div class="formgrid">
+<div class="field"><label>Monthly salary in USD</label><input id="salary" type="number" min="0" step=".01"></div>
+<div class="field"><label>Naira per $1</label><input id="rate" type="number" min="0"></div>
+<div class="field"><label>Other monthly income, ₦</label><input id="extra" type="number" min="0"></div>
+<div class="field"><label>Savings goal, ₦</label><input id="goal" type="number" min="0"></div>
+</div><div class="note" id="incomeNote"></div></div>
+
+<div class="card" id="plan"><div class="head"><div><h2>Monthly budget plan</h2><p>Set an amount and tell the app whether it is per day, per week or per month.</p></div><button class="btn primary" id="addCat">+ Add category</button></div><div id="cats" class="budgetlist"></div><div style="display:flex;justify-content:space-between;border-top:1px solid var(--line);margin-top:13px;padding-top:13px"><b>Total planned</b><b id="planTotal">₦0</b></div></div>
+
+<div class="card" id="history"><div class="head"><div><h2>Spending history</h2><p>Log every expense, including the small ones.</p></div><button id="clearMonth" class="btn danger">Clear month</button></div>
+<div class="tablewrap"><table><thead><tr><th>Date</th><th>Category</th><th>What was it?</th><th>Amount</th><th></th></tr></thead><tbody id="tbody"></tbody></table><div id="empty" class="empty">No expenses logged for this month yet.</div></div></div>
+</div>
+
+<aside class="stack">
+<div class="card sticky" id="add"><div class="head"><div><h2>Add spending</h2><p>Do this whenever money leaves your hand or account.</p></div></div>
+<form id="txForm" class="stack" style="gap:10px">
+<div class="field"><label>Date</label><input id="date" type="date" required></div>
+<div class="field"><label>Category</label><select id="catSelect" required></select></div>
+<div class="field"><label>What did you spend on?</label><input id="desc" placeholder="e.g. Bolt to work, lunch, fuel" maxlength="80"></div>
+<div class="field"><label>Amount, ₦</label><input id="amount" type="number" min="1" required></div>
+<button class="btn blue" type="submit">Add expense</button></form></div>
+
+<div class="card"><div class="head"><div><h2>This month's picture</h2><p>Budget health at a glance.</p></div></div><div id="status" class="status good"></div>
+<b style="font-size:13px">Income used</b><div id="usedBar" class="progress"><i></i></div><div class="usage"><span id="usedText">₦0 spent</span><span id="usedPct">0%</span></div>
+<div style="margin-top:16px"><b style="font-size:13px">Savings goal</b><div id="saveBar" class="progress"><i></i></div><div class="usage"><span id="saveText">₦0 available</span><span id="savePct">0%</span></div></div></div>
+
+<div class="card"><div class="head"><div><h2>Where the money went</h2><p>Actual spending by category.</p></div></div><div id="bars" class="bars"></div></div>
+
+<div class="card"><div class="head"><div><h2>Backup & restore</h2><p>Your data stays in this browser.</p></div></div><div class="backup">Export a backup occasionally, especially before changing phones or browsers.<div class="actions" style="margin-top:10px"><button class="btn soft" id="export">Export</button><button class="btn soft" id="import">Import</button><input id="file" type="file" accept="application/json" hidden></div></div><button id="reset" class="btn danger" style="margin-top:10px">Reset everything</button></div>
+</aside>
+</section>
+<div class="footer">Private by default. Nothing is sent to a server.</div>
+</div>
+
+<script>
+const KEY='sams-budget-v1',D=30,W=4.33,$=id=>document.getElementById(id),fmt=new Intl.NumberFormat('en-NG',{style:'currency',currency:'NGN',maximumFractionDigits:0});
+const uid=()=>crypto.randomUUID(),nowMonth=()=>{let d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')},today=()=>{let d=new Date(Date.now()-new Date().getTimezoneOffset()*60000);return d.toISOString().slice(0,10)};
+const starter=()=>({settings:{salary:650,rate:1500,extra:0,goal:150000},categories:[
+['Transport',3500,'daily'],['Feeding',5000,'daily'],['Fuel',25000,'weekly'],['Bills & Utilities',60000,'monthly'],['Night Out / Fun',15000,'weekly'],['Gifts to Friends & Family',30000,'monthly'],['Debt Repayment',0,'monthly'],['Airtime & Data',20000,'monthly'],['Rent / Housing',0,'monthly'],['Health',15000,'monthly'],['Personal Care',15000,'monthly'],['Other',0,'monthly']
+].map(x=>({id:uid(),name:x[0],amount:x[1],freq:x[2]})),transactions:[]});
+let s;try{s=JSON.parse(localStorage.getItem(KEY))||starter()}catch{s=starter()}let active=nowMonth();
+const save=()=>localStorage.setItem(KEY,JSON.stringify(s)),money=n=>fmt.format(Number(n)||0),esc=x=>String(x??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const monthly=c=>c.freq==='daily'?(+c.amount||0)*D:c.freq==='weekly'?(+c.amount||0)*W:(+c.amount||0),income=()=> (+s.settings.salary||0)*(+s.settings.rate||0)+(+s.settings.extra||0),monthTx=()=>s.transactions.filter(t=>t.date.slice(0,7)===active),spent=()=>monthTx().reduce((a,t)=>a+(+t.amount||0),0),planned=()=>s.categories.reduce((a,c)=>a+monthly(c),0),catSpent=id=>monthTx().filter(t=>t.categoryId===id).reduce((a,t)=>a+(+t.amount||0),0);
+function selects(){let opt=s.categories.map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join('');$('catSelect').innerHTML=opt||'<option>Add a category first</option>'}
+function settings(){['salary','rate','extra','goal'].forEach(k=>$(k).value=s.settings[k]);$('incomeNote').innerHTML='<b>'+money(income())+' estimated monthly income.</b> $'+(+s.settings.salary||0).toLocaleString()+' × ₦'+(+s.settings.rate||0).toLocaleString()+' plus '+money(s.settings.extra)+' other income.'}
+function cats(){let box=$('cats');if(!s.categories.length){box.innerHTML='<div class="empty">No categories yet.</div>';return}box.innerHTML=s.categories.map(c=>{let p=monthly(c),a=catSpent(c.id),pct=p?Math.min(100,a/p*100):(a?100:0);return '<div class="budgetitem" data-id="'+c.id+'"><div class="row"><input class="n" value="'+esc(c.name)+'"><input class="a" type="number" min="0" value="'+(+c.amount||0)+'"><select class="f"><option value="daily" '+(c.freq==='daily'?'selected':'')+'>Per day</option><option value="weekly" '+(c.freq==='weekly'?'selected':'')+'>Per week</option><option value="monthly" '+(c.freq==='monthly'?'selected':'')+'>Per month</option></select><small>≈ <b>'+money(p)+'</b>/month</small><button class="btn danger del">Delete</button></div><div class="usage"><span>Actual: <b>'+money(a)+'</b></span><span>'+(p?Math.round(a/p*100)+'% used':a?'No budget':'0% used')+'</span></div><div class="progress '+(a>p&&p?'over':'')+'"><i style="width:'+pct+'%"></i></div></div>'}).join('');$('planTotal').textContent=money(planned())}
+function history(){let list=monthTx().sort((a,b)=>b.date.localeCompare(a.date));$('empty').style.display=list.length?'none':'block';$('tbody').innerHTML=list.map(t=>{let c=s.categories.find(x=>x.id===t.categoryId);return '<tr><td>'+t.date.slice(8,10)+'/'+t.date.slice(5,7)+'</td><td><span class="pill">'+esc(c?c.name:'Deleted category')+'</span></td><td>'+esc(t.desc||'Expense')+'</td><td><b>'+money(t.amount)+'</b></td><td><div class="actions"><button class="btn soft edit" data-id="'+t.id+'">Edit</button><button class="btn danger txdel" data-id="'+t.id+'">Delete</button></div></td></tr>'}).join('')}
+function summary(){let i=income(),p=planned(),a=spent(),left=i-a,goal=+s.settings.goal||0,avail=Math.max(0,left),up=i?a/i*100:0,sp=goal?avail/goal*100:0;$('mIncome').textContent=money(i);$('mPlan').textContent=money(p);$('mSpent').textContent=money(a);$('mLeft').textContent=money(left);$('mLeft').className=left<0?'red':'green';$('txCount').textContent=monthTx().length+' transaction'+(monthTx().length===1?'':'s');$('usedBar').className='progress '+(up>100?'over':'');$('usedBar').querySelector('i').style.width=Math.min(100,Math.max(0,up))+'%';$('usedText').textContent=money(a)+' spent';$('usedPct').textContent=Math.round(up)+'%';$('saveBar').querySelector('i').style.width=Math.min(100,Math.max(0,sp))+'%';$('saveText').textContent=money(avail)+' available';$('savePct').textContent=goal?Math.round(sp)+'% of goal':'No goal set';let st=$('status');if(left<0){st.className='status bad';st.innerHTML='<div><b>Over income for this month</b>You are '+money(Math.abs(left))+' over.</div>'}else if(p>i&&i){st.className='status warn';st.innerHTML='<div><b>Your plan is too high</b>Planned spending is '+money(p-i)+' above monthly income.</div>'}else if(goal&&avail<goal){st.className='status warn';st.innerHTML='<div><b>Protect the savings goal</b>You have '+money(avail)+' left against a '+money(goal)+' goal.</div>'}else{st.className='status good';st.innerHTML='<div><b>Looking manageable</b>Your plan leaves '+money(Math.max(0,i-p))+' before the month starts.</div>'}}
+function bars(){let arr=s.categories.map(c=>({name:c.name,val:catSpent(c.id)})).filter(x=>x.val).sort((a,b)=>b.val-a.val),mx=arr[0]?.val||1;$('bars').innerHTML=arr.length?arr.slice(0,8).map(x=>'<div class="bar"><span>'+esc(x.name)+'</span><div class="track"><div class="fill" style="width:'+(x.val/mx*100)+'%"></div></div><span>'+money(x.val)+'</span></div>').join(''):'<div class="empty">Your breakdown appears after you add expenses.</div>'}
+function render(){save();settings();selects();cats();history();summary();bars()}
+$('month').value=active;$('date').value=today();$('month').onchange=e=>{active=e.target.value||nowMonth();render()};
+['salary','rate','extra','goal'].forEach(k=>$(k).onchange=e=>{s.settings[k]=+e.target.value||0;render()});
+$('addCat').onclick=()=>{s.categories.push({id:uid(),name:'New Category',amount:0,freq:'monthly'});render()};
+$('cats').onchange=e=>{let card=e.target.closest('.budgetitem'),c=s.categories.find(x=>x.id===card?.dataset.id);if(!c)return;if(e.target.classList.contains('n'))c.name=e.target.value.trim()||'Unnamed';if(e.target.classList.contains('a'))c.amount=+e.target.value||0;if(e.target.classList.contains('f'))c.freq=e.target.value;render()};
+$('cats').onclick=e=>{if(!e.target.classList.contains('del'))return;let id=e.target.closest('.budgetitem').dataset.id,c=s.categories.find(x=>x.id===id);if(confirm('Delete '+c.name+'?')){s.categories=s.categories.filter(x=>x.id!==id);render()}};
+$('txForm').onsubmit=e=>{e.preventDefault();if(!s.categories.length)return alert('Add a category first.');let d=$('date').value,a=+$('amount').value||0;if(!d||!a)return;s.transactions.push({id:uid(),date:d,categoryId:$('catSelect').value,desc:$('desc').value.trim(),amount:a});active=d.slice(0,7);$('month').value=active;$('amount').value='';$('desc').value='';$('date').value=today();render()};
+$('tbody').onclick=e=>{let id=e.target.dataset.id,t=s.transactions.find(x=>x.id===id);if(!t)return;if(e.target.classList.contains('txdel')&&confirm('Delete '+money(t.amount)+' expense?')){s.transactions=s.transactions.filter(x=>x.id!==id);render()}if(e.target.classList.contains('edit')){let a=prompt('Amount in Naira',t.amount);if(a===null)return;let d=prompt('What was it?',t.desc||'');if(d===null)return;t.amount=Math.max(0,+a||0);t.desc=d.trim();render()}};
+$('clearMonth').onclick=()=>{let n=monthTx().length;if(n&&confirm('Delete all '+n+' expenses for '+active+'?')){s.transactions=s.transactions.filter(t=>t.date.slice(0,7)!==active);render()}};
+$('export').onclick=()=>{let b=new Blob([JSON.stringify({app:"Sam's Budget",version:1,data:s},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='sams-budget-backup-'+today()+'.json';a.click()};
+$('import').onclick=()=>$('file').click();$('file').onchange=async e=>{try{let j=JSON.parse(await e.target.files[0].text()),x=j.data||j;if(!x.settings||!Array.isArray(x.categories)||!Array.isArray(x.transactions))throw 0;if(confirm('Replace the current data with this backup?')){s=x;render()}}catch{alert('Invalid backup file')}e.target.value=''};
+$('reset').onclick=()=>{if(confirm('Reset everything? This deletes all saved expenses in this browser.')){s=starter();active=nowMonth();$('month').value=active;render()}};
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.go).scrollIntoView({behavior:'smooth'}));render();
+</script></body></html>
